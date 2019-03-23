@@ -46,7 +46,7 @@ namespace AlphaSteamerMod
         }
     }
 
-    // reduce max coal consumption 3 times
+    // 3 times less max coal consumption 
     [HarmonyPatch(typeof(SteamLocoSimulation), "Awake")]
     class SteamLocoSimulation_Awake_Patch
     {
@@ -56,30 +56,55 @@ namespace AlphaSteamerMod
         }
     }
 
-    // reduce coal consumption 3 times
+    // 3 times less coal consumption and reduce coal temperature gain by 30%
     [HarmonyPatch(typeof(SteamLocoSimulation), "SimulateBlowerDraftFireCoalTemp")]
     class SteamLocoSimulation_SimulateBlowerDraftFireCoalTemp_Patch
     {
         static void Postfix(SteamLocoSimulation __instance, float deltaTime)
         {
-            if (__instance.fireOn.value > 0.0f && __instance.coalbox.value > 0.0f)
+            if (__instance.fireOn.value > 0.01f && __instance.coalbox.value > 0.01f)
             {
                 __instance.coalbox.AddNextValue(__instance.coalConsumptionRate * deltaTime * 0.666f);
+            }
+
+            if (__instance.fireOn.value > 0.99f && __instance.coalbox.value > 0.01f)
+            {
+                __instance.temperature.AddNextValue((650.0f * (__instance.coalbox.value / 350.0f) - __instance.temperature.value / 16.0f) * deltaTime * -0.3f);
             }
         }
     }
 
-    // reduce water consumption 2 times
+    // reduce water consumption by 50%
     [HarmonyPatch(typeof(SteamLocoSimulation), "SimulateSteam")]
     class SteamLocoSimulation_SimulateSteam_Patch
     {
         static void Postfix(SteamLocoSimulation __instance, float deltaTime)
         {
-            if (__instance.temperature.value >= 100.0f && (__instance.boilerWater.value > 0.0f && __instance.boilerPressure.value < __instance.boilerPressure.max * 0.999f))
+            if (__instance.temperature.value >= 100.0f && (__instance.boilerWater.value > 0.01f && __instance.boilerPressure.value < __instance.boilerPressure.max * 0.999f))
             {
                 var waterRemoved = 0.200000002980232f * __instance.temperature.value * deltaTime * 0.5f;
 
                 __instance.boilerWater.AddNextValue(waterRemoved);
+            }
+        }
+    }
+
+    // reduce wheelslip by 10%
+    [HarmonyPatch(typeof(TrainCar), "Awake")]
+    class TrainCar_Awake_Patch
+    {
+        static void Postfix(TrainCar __instance)
+        {
+            if (__instance.carType == TrainCarType.LocoSteamHeavy)
+            {
+                var drivingForce = __instance.GetComponent<DrivingForce>();
+
+                var wheelslipToFrictionModifierCurve = new AnimationCurve();
+                wheelslipToFrictionModifierCurve.AddKey(0f, 0.35f);
+                wheelslipToFrictionModifierCurve.AddKey(0.25f, 0.35f);
+                wheelslipToFrictionModifierCurve.AddKey(1f, 0.0f);
+
+                drivingForce.wheelslipToFrictionModifierCurve = wheelslipToFrictionModifierCurve;
             }
         }
     }
